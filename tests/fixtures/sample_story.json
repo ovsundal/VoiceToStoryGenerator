@@ -1,0 +1,19 @@
+{
+  "scenes": [
+    {
+      "index": 0,
+      "caption_no": "Vasker hendene",
+      "image_path": "tests/fixtures/sample_image.png"
+    },
+    {
+      "index": 1,
+      "caption_no": "Tørker hendene",
+      "image_path": "tests/fixtures/sample_image.png"
+    },
+    {
+      "index": 2,
+      "caption_no": "Tar på seg jakken",
+      "image_path": "tests/fixtures/sample_image.png"
+    }
+  ]
+}
