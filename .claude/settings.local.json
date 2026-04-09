@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx biome:*)",
+      "Bash(ruff:*)",
+      "Bash(pip show ruff:*)",
+      "Bash(pip install ruff:*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npm install:*)",
+      "Bash(mkdir -p resources/whisper)",
+      "Bash(touch resources/whisper/.gitkeep)",
+      "Bash(rm src/index.ts)",
+      "Bash(npm run:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npx vitest:*)",
+      "Bash(pytest:*)",
+      "Bash(pip install pytest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm uninstall:*)"
+    ]
+  }
+}
