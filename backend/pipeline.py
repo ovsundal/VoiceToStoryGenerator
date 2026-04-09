@@ -1,8 +1,13 @@
-"""Stub pipeline for Phase 1. Emits fixture events without loading any models."""
+"""Pipeline orchestration. Phase 2: real transcription; Phase 3 stubs for segmentation/images."""
 
 import argparse
 import json
+import sys
 import time
+from pathlib import Path
+
+# Ensure project root is on sys.path when running as a script
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def emit(event: str, **data) -> None:
@@ -17,11 +22,34 @@ STUB_SCENES = [
 ]
 
 
-def run(audio_path: str, output_dir: str) -> None:
-    emit("progress", stage="transcribing")
-    time.sleep(0.4)
+def run(audio_path: str | None, text: str | None, output_dir: str) -> None:
+    if text:
+        # Text-input path: skip transcription
+        emit("progress", stage="segmenting")
+    else:
+        # Audio path: run real transcription
+        from backend.transcriber import (  # noqa: PLC0415
+            DEFAULT_MODEL_DIR,
+            download_model,
+            is_model_cached,
+            load_model,
+            transcribe,
+        )
 
-    emit("progress", stage="segmenting")
+        if not is_model_cached():
+            emit("progress", stage="downloading_model", pct=0)
+            download_model(
+                DEFAULT_MODEL_DIR,
+                on_progress=lambda pct: emit("progress", stage="downloading_model", pct=pct),
+            )
+
+        emit("progress", stage="loading_model")
+        model = load_model()
+        emit("progress", stage="transcribing")
+        text = transcribe(model, audio_path)
+        emit("progress", stage="segmenting")
+
+    # Phase 3 stub: segmentation and image generation
     time.sleep(0.5)
 
     stub_image = "tests/fixtures/sample_image.png"
@@ -46,7 +74,37 @@ def run(audio_path: str, output_dir: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Story-to-Images pipeline")
-    parser.add_argument("--audio", required=True, help="Path to input audio WAV file")
-    parser.add_argument("--output", required=True, help="Directory for output images")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--audio", help="Path to input audio file")
+    group.add_argument("--text", help="Pre-transcribed text (skips transcription)")
+    parser.add_argument("--output", help="Directory for output images")
+    parser.add_argument("--transcribe-only", action="store_true", help="Transcribe audio and exit")
     args = parser.parse_args()
-    run(audio_path=args.audio, output_dir=args.output)
+
+    if args.transcribe_only:
+        from backend.transcriber import (  # noqa: PLC0415
+            DEFAULT_MODEL_DIR,
+            download_model,
+            is_model_cached,
+            load_model,
+            transcribe,
+        )
+
+        if not is_model_cached():
+            emit("progress", stage="downloading_model", pct=0)
+            download_model(
+                DEFAULT_MODEL_DIR,
+                on_progress=lambda pct: emit("progress", stage="downloading_model", pct=pct),
+            )
+
+        emit("progress", stage="loading_model")
+        model = load_model()
+        emit("progress", stage="transcribing")
+        text = transcribe(model, args.audio)
+        emit("transcript", text=text)
+        sys.exit(0)
+
+    if not args.output:
+        parser.error("--output is required unless --transcribe-only is set")
+
+    run(audio_path=args.audio, text=args.text, output_dir=args.output)

@@ -10,3 +10,16 @@ def sample_audio(tmp_path: Path) -> str:
     dst = tmp_path / "audio.wav"
     dst.write_bytes(src.read_bytes())
     return str(dst)
+
+
+@pytest.fixture(autouse=True)
+def mock_transcriber(monkeypatch):
+    """Prevent real faster-whisper model loading in all unit tests."""
+    monkeypatch.setattr(
+        "backend.transcriber.load_model",
+        lambda *a, **kw: None,
+    )
+    monkeypatch.setattr(
+        "backend.transcriber.transcribe",
+        lambda model, path, **kw: "Barnet vasker hendene og tørker seg.",
+    )

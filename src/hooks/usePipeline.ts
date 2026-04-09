@@ -4,6 +4,7 @@ import type { PipelineProgressEvent, Scene } from '../preload/index';
 export interface PipelineState {
   stage: string | null;
   progress: { current: number; total: number } | null;
+  downloadPct: number | null;
   scenes: Scene[];
   error: string | null;
   isRunning: boolean;
@@ -13,13 +14,21 @@ export function usePipeline() {
   const [state, setState] = useState<PipelineState>({
     stage: null,
     progress: null,
+    downloadPct: null,
     scenes: [],
     error: null,
     isRunning: false,
   });
 
   const start = useCallback(async (audioPath: string) => {
-    setState({ stage: 'starting', progress: null, scenes: [], error: null, isRunning: true });
+    setState({
+      stage: 'starting',
+      progress: null,
+      downloadPct: null,
+      scenes: [],
+      error: null,
+      isRunning: true,
+    });
     await window.electronAPI.startPipeline(audioPath);
   }, []);
 
@@ -36,6 +45,8 @@ export function usePipeline() {
             return {
               ...s,
               stage: event.stage ?? s.stage,
+              downloadPct:
+                event.stage === 'downloading_model' ? (event.pct ?? s.downloadPct) : s.downloadPct,
               progress:
                 event.index != null
                   ? { current: event.index, total: event.total ?? 0 }

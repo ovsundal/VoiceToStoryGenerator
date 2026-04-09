@@ -10,8 +10,10 @@ describe('usePipeline', () => {
       startPipelineWithText: vi.fn().mockResolvedValue(undefined),
       cancelPipeline: vi.fn().mockResolvedValue(undefined),
       onPipelineEvent: vi.fn().mockReturnValue(() => {}),
-      startRecording: vi.fn().mockResolvedValue('/tmp/audio.wav'),
-      stopRecording: vi.fn().mockResolvedValue('/tmp/audio.wav'),
+      saveRecording: vi.fn().mockResolvedValue('/tmp/audio.webm'),
+      transcribeAudio: vi.fn().mockResolvedValue('Barnet vasker hendene.'),
+      cancelTranscription: vi.fn().mockResolvedValue(undefined),
+      onTranscriptionEvent: vi.fn().mockReturnValue(() => {}),
     };
   });
 

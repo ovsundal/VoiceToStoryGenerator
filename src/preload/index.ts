@@ -11,6 +11,7 @@ export interface PipelineProgressEvent {
   stage?: string;
   index?: number;
   total?: number;
+  pct?: number;
   caption_no?: string;
   image_path?: string;
   scenes?: Scene[];
@@ -22,8 +23,10 @@ export interface ElectronAPI {
   startPipelineWithText: (text: string) => Promise<void>;
   cancelPipeline: () => Promise<void>;
   onPipelineEvent: (callback: (event: PipelineProgressEvent) => void) => () => void;
-  startRecording: () => Promise<string>;
-  stopRecording: () => Promise<string>;
+  saveRecording: (data: ArrayBuffer) => Promise<string>;
+  transcribeAudio: (audioPath: string) => Promise<string>;
+  cancelTranscription: () => Promise<void>;
+  onTranscriptionEvent: (callback: (event: PipelineProgressEvent) => void) => () => void;
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -39,6 +42,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('pipeline:event', handler);
   },
 
-  startRecording: () => ipcRenderer.invoke('recording:start'),
-  stopRecording: () => ipcRenderer.invoke('recording:stop'),
+  saveRecording: (data: ArrayBuffer) => ipcRenderer.invoke('recording:save', data),
+
+  transcribeAudio: (audioPath: string) => ipcRenderer.invoke('pipeline:transcribe', audioPath),
+
+  cancelTranscription: () => ipcRenderer.invoke('pipeline:transcribe-cancel'),
+
+  onTranscriptionEvent: (callback: (event: PipelineProgressEvent) => void) => {
+    const handler = (_: unknown, event: PipelineProgressEvent) => callback(event);
+    ipcRenderer.on('transcription:event', handler);
+    return () => ipcRenderer.removeListener('transcription:event', handler);
+  },
 } satisfies ElectronAPI);

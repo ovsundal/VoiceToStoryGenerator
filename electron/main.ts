@@ -1,10 +1,12 @@
 import { type ChildProcess, spawn } from 'node:child_process';
+import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { BrowserWindow, Menu, app, ipcMain } from 'electron';
 
 const isTestMode = process.argv.includes('--test-mode');
 let mainWindow: BrowserWindow;
 let pipelineProcess: ChildProcess | null = null;
+let transcriptionProcess: ChildProcess | null = null;
 
 // Hardcoded fixture for test mode — avoids file-read failures in CI/E2E
 const TEST_FIXTURE_SCENES = [
@@ -67,6 +69,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 800,
     minHeight: 600,
+    icon: join(app.getAppPath(), 'resources', 'icons', 'icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -95,7 +98,7 @@ app.on('window-all-closed', () => {
 
 // --- Pipeline IPC ---
 
-ipcMain.handle('pipeline:start', async () => {
+ipcMain.handle('pipeline:start', async (_, audioPath: string) => {
   if (isTestMode) {
     emitFixtureEvents();
     return;
@@ -103,10 +106,12 @@ ipcMain.handle('pipeline:start', async () => {
 
   if (pipelineProcess) return;
 
-  const pythonPath = join(app.getAppPath(), 'backend', '.venv', 'Scripts', 'python.exe');
+  const pythonPath = join(app.getAppPath(), 'backend', 'venv', 'Scripts', 'python.exe');
   const scriptPath = join(app.getAppPath(), 'backend', 'pipeline.py');
+  const outputDir = join(app.getPath('temp'), `story_${Date.now()}`);
+  await fs.mkdir(outputDir, { recursive: true });
 
-  pipelineProcess = spawn(pythonPath, [scriptPath, '--audio', ''], {
+  pipelineProcess = spawn(pythonPath, [scriptPath, '--audio', audioPath, '--output', outputDir], {
     env: { ...process.env, PYTHONUNBUFFERED: '1' },
   });
 
@@ -191,10 +196,12 @@ ipcMain.handle('pipeline:start-with-text', async (_, _text: string) => {
 
   if (pipelineProcess) return;
 
-  const pythonPath = join(app.getAppPath(), 'backend', '.venv', 'Scripts', 'python.exe');
+  const pythonPath = join(app.getAppPath(), 'backend', 'venv', 'Scripts', 'python.exe');
   const scriptPath = join(app.getAppPath(), 'backend', 'pipeline.py');
+  const outputDir = join(app.getPath('temp'), `story_${Date.now()}`);
+  await fs.mkdir(outputDir, { recursive: true });
 
-  pipelineProcess = spawn(pythonPath, [scriptPath, '--text', _text], {
+  pipelineProcess = spawn(pythonPath, [scriptPath, '--text', _text, '--output', outputDir], {
     env: { ...process.env, PYTHONUNBUFFERED: '1' },
   });
 
@@ -234,6 +241,69 @@ ipcMain.handle('pipeline:cancel', async () => {
   pipelineProcess = null;
 });
 
-// Stubs for Phase 2
-ipcMain.handle('recording:start', async () => '/tmp/recording_stub.wav');
-ipcMain.handle('recording:stop', async () => '/tmp/recording_stub.wav');
+ipcMain.handle('pipeline:transcribe', async (_, audioPath: string): Promise<string> => {
+  if (isTestMode) {
+    setTimeout(
+      () =>
+        mainWindow.webContents.send('transcription:event', {
+          event: 'progress',
+          stage: 'transcribing',
+        }),
+      200
+    );
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    return 'Barnet vasker hendene og tørker seg.';
+  }
+
+  return new Promise((resolve, reject) => {
+    const pythonPath = join(app.getAppPath(), 'backend', 'venv', 'Scripts', 'python.exe');
+    const scriptPath = join(app.getAppPath(), 'backend', 'pipeline.py');
+
+    transcriptionProcess = spawn(
+      pythonPath,
+      [scriptPath, '--audio', audioPath, '--transcribe-only'],
+      { env: { ...process.env, PYTHONUNBUFFERED: '1' } }
+    );
+
+    let buffer = '';
+    transcriptionProcess.stdout?.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
+          if (event.event === 'transcript') {
+            transcriptionProcess = null;
+            resolve(event.text ?? '');
+          } else {
+            mainWindow.webContents.send('transcription:event', event);
+          }
+        } catch {
+          console.error('Non-JSON stdout from transcription:', line);
+        }
+      }
+    });
+
+    transcriptionProcess.stderr?.on('data', (chunk: Buffer) => {
+      console.error('[transcription stderr]', chunk.toString());
+    });
+
+    transcriptionProcess.on('close', (code) => {
+      transcriptionProcess = null;
+      if (code !== 0) reject(new Error(`Transcription exited with code ${code}`));
+    });
+  });
+});
+
+ipcMain.handle('pipeline:transcribe-cancel', async () => {
+  transcriptionProcess?.kill();
+  transcriptionProcess = null;
+});
+
+ipcMain.handle('recording:save', async (_, data: ArrayBuffer): Promise<string> => {
+  const audioPath = join(app.getPath('temp'), `recording_${Date.now()}.webm`);
+  await fs.writeFile(audioPath, Buffer.from(data));
+  return audioPath;
+});

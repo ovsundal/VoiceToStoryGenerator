@@ -22,6 +22,6 @@ test('no menu bar visible', async () => {
   const { app, page } = await launchApp();
   // Menu bar is removed — verify the window title is the app title, not a menu item
   const title = await page.title();
-  expect(title).toBe('Story to Images');
+  expect(title).toBe('Fortelling til bilder');
   await app.close();
 });

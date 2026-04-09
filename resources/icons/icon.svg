@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0066cc"/>
+  <!-- Microphone body -->
+  <rect x="180" y="100" width="72" height="140" rx="36" fill="white"/>
+  <!-- Microphone arc -->
+  <path d="M148 230 Q148 310 216 310 Q284 310 284 230" fill="none" stroke="white" stroke-width="16" stroke-linecap="round"/>
+  <!-- Microphone stand -->
+  <line x1="216" y1="310" x2="216" y2="350" stroke="white" stroke-width="16" stroke-linecap="round"/>
+  <line x1="180" y1="350" x2="252" y2="350" stroke="white" stroke-width="16" stroke-linecap="round"/>
+  <!-- Arrow -->
+  <path d="M296 256 L336 256 M320 236 L340 256 L320 276" fill="none" stroke="white" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Image grid: 4 frames -->
+  <rect x="352" y="140" width="76" height="76" rx="10" fill="white" opacity="0.9"/>
+  <rect x="440" y="140" width="76" height="76" rx="10" fill="white" opacity="0.9"/>
+  <rect x="352" y="228" width="76" height="76" rx="10" fill="white" opacity="0.9"/>
+  <rect x="440" y="228" width="76" height="76" rx="10" fill="white" opacity="0.9"/>
+  <!-- Mountain pictogram inside each frame (simple) -->
+  <path d="M362 202 L390 165 L418 202 Z" fill="#0066cc" opacity="0.4"/>
+  <path d="M450 202 L478 165 L506 202 Z" fill="#0066cc" opacity="0.4"/>
+  <path d="M362 290 L390 253 L418 290 Z" fill="#0066cc" opacity="0.4"/>
+  <path d="M450 290 L478 253 L506 290 Z" fill="#0066cc" opacity="0.4"/>
+</svg>
