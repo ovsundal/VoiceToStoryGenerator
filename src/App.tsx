@@ -13,6 +13,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [pendingScenes, setPendingScenes] = useState<SegmentedScene[]>([]);
   const [outputDir, setOutputDir] = useState<string>('');
+  const [story, setStory] = useState<string>('');
   const pipeline = usePipeline();
 
   // Processing → Review: fires when segmentation completes
@@ -23,14 +24,15 @@ export default function App() {
     }
   }, [pipeline.segmentedScenes, screen]);
 
-  // Processing → Viewer: fires when image generation completes
+  // Processing → Viewer: fires as soon as the first image is ready
   useEffect(() => {
-    if (pipeline.stage === 'done' && screen === 'processing') {
+    if (pipeline.scenes.length > 0 && screen === 'processing') {
       setScreen('viewer');
     }
-  }, [pipeline.stage, screen]);
+  }, [pipeline.scenes.length, screen]);
 
   const handleStartSegment = (payload: { audioPath?: string; text?: string }) => {
+    setStory(payload.text ?? '');
     setScreen('processing');
     pipeline.segment(payload);
   };
@@ -51,6 +53,7 @@ export default function App() {
   const handleHome = () => {
     pipeline.reset();
     setOutputDir('');
+    setStory('');
     setScreen('home');
   };
 
@@ -61,7 +64,15 @@ export default function App() {
       {screen === 'review' && (
         <ReviewScreen scenes={pendingScenes} onGenerate={handleGenerate} onCancel={handleCancel} />
       )}
-      {screen === 'viewer' && <ViewerScreen scenes={pipeline.scenes} onHome={handleHome} />}
+      {screen === 'viewer' && (
+        <ViewerScreen
+          scenes={pipeline.scenes}
+          totalScenes={pipeline.progress?.total ?? null}
+          isRunning={pipeline.isRunning}
+          story={story}
+          onHome={handleHome}
+        />
+      )}
     </>
   );
 }

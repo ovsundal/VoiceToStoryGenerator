@@ -70,10 +70,24 @@ _SYSTEM_PROMPT = (
     "Return ONLY a valid JSON array. No prose, no code fences, no extra text."
 )
 
+_PERSONA_SUFFIX = (
+    " Characters: {personas}. "
+    "When a character's name appears in the story, use their description in prompt_en."
+)
+
 _DESCRIBE_TEMPLATE = """\
 Describe this action as a single cartoon image for autistic individuals.
-Return exactly one JSON object in an array:
-[{{"prompt_en": "English image description of the action", "caption_no": "Norsk tekst som beskriver handlingen"}}]
+
+Return exactly this JSON structure (one object in an array):
+[{{"prompt_en": "...", "caption_no": "..."}}]
+
+- prompt_en: who is doing what AND the key setting or object (e.g. "school building", "swimming pool"). Max 15 words. No invented details.
+- caption_no: copy the action text in Norwegian as-is.
+
+Example:
+Action: "Emil skal på skolen"
+Output:
+[{{"prompt_en": "boy walking toward a school building", "caption_no": "Emil skal på skolen"}}]
 
 Action: {transcript}"""
 
@@ -83,30 +97,54 @@ Split the story into scenes — one scene per distinct action that is explicitly
 STRICT RULES:
 - Only include actions that appear in the text. Never add implied or inferred steps.
 - Each scene must describe exactly ONE action. Never combine two actions into one scene.
-- The Norwegian caption must describe only what happens in that specific scene.
 - Produce exactly one scene per explicit action mentioned, up to {max_scenes} scenes total.
+- prompt_en: describe who is doing what AND the key setting or object visible (e.g. "school building", "swimming pool", "dinner table", "PlayStation controller"). Max 15 words. No invented details.
+- caption_no: copy the relevant words from the story text as-is.
 
 Example:
-Story: "Lena vasker hendene. Etterpå tørker hun hendene."
-Correct output:
+Story: "Emil skal på skolen. Etterpå skal han på skolefritidsordning. Senere skal han og Sigurd spille playstation."
+Output:
 [
-  {{"prompt_en": "Lena washing her hands at a sink", "caption_no": "Lena vasker hendene"}},
-  {{"prompt_en": "Lena drying her hands with a towel", "caption_no": "Lena tørker hendene"}}
+  {{"prompt_en": "boy walking toward a school building", "caption_no": "Emil skal på skolen"}},
+  {{"prompt_en": "boy arriving at afterschool care building", "caption_no": "Etterpå skal han på skolefritidsordning"}},
+  {{"prompt_en": "two boys sitting on a couch playing PlayStation", "caption_no": "Senere skal han og Sigurd spille playstation"}}
 ]
 
-Now split this story:
 Story: {transcript}"""
+
+_POLISH_TEMPLATE = """\
+Rewrite each Norwegian caption. Apply ALL rules to EVERY caption:
+1. Remove leading time words: Idag, Etterpå, Senere, Så, Deretter, Først, Etter det
+2. Replace pronouns (han, hun, de, dem) with the character's name — use the other captions as context
+3. Convert future tense to present tense:
+   - "skal [verb]" → conjugate THAT verb, do not substitute a different verb
+     e.g. "skal spise" → "spiser"  (NOT "har")
+     e.g. "skal svømme" → "svømmer"
+     e.g. "skal spille" → "spiller"
+   - "skal på [place]" → "er på [place]"  (add "er" when there is no explicit verb)
+     e.g. "skal på skolefritidsordning" → "er på skolefritidsordning"
+     e.g. "skal på skolen" → "går på skolen"  (skolen is a destination, use "går på")
+4. Max 5 words per caption
+
+Input captions (JSON array):
+{captions_json}
+
+Return a JSON array of rewritten strings, same order, same length. Nothing else."""
 
 
 def load_model(model_dir: str = DEFAULT_MODEL_DIR, n_gpu_layers: int = 0) -> Llama:
-    """Load the GGUF model. n_gpu_layers=0 means CPU-only (required per PRD)."""
+    """Load the GGUF model. n_gpu_layers=0 means CPU-only (required per PRD).
+
+    n_ctx=4096 — llama.cpp defaults to 512 if not set, which is far too small
+    for our prompts (templates + story + JSON output easily exceed 1k tokens).
+    """
     from llama_cpp import Llama as _Llama  # noqa: PLC0415
 
     model_path = Path(model_dir) / _MODEL_FILENAME
-    return _Llama(model_path=str(model_path), n_gpu_layers=n_gpu_layers, verbose=False)
+    return _Llama(model_path=str(model_path), n_gpu_layers=n_gpu_layers, n_ctx=4096, verbose=False)
 
 
-def segment(model: Llama, transcript: str, max_scenes: int = 5) -> list[dict]:
+def segment(model: Llama, transcript: str, max_scenes: int = 5, personas: list[dict] | None = None) -> list[dict]:
     """Segment a transcript into a list of scene dicts.
 
     Returns: [{"index": int, "prompt_en": str, "caption_no": str}, ...]
@@ -116,11 +154,11 @@ def segment(model: Llama, transcript: str, max_scenes: int = 5) -> list[dict]:
     print(f"[segmenter] input: {transcript!r}", file=sys.stderr, flush=True)
     estimated = _estimate_scenes(transcript, max_scenes)
     print(f"[segmenter] estimated scenes: {estimated}", file=sys.stderr, flush=True)
-    raw = _call_model(model, transcript, estimated)
+    raw = _call_model(model, transcript, estimated, personas=personas)
     print(f"[segmenter] raw LLM output: {raw!r}", file=sys.stderr, flush=True)
     scenes = _try_parse_json(raw)
     if scenes is None:
-        raw = _call_model(model, transcript, max_scenes, retry=True)
+        raw = _call_model(model, transcript, max_scenes, retry=True, personas=personas)
         print(f"[segmenter] retry LLM output: {raw!r}", file=sys.stderr, flush=True)
         scenes = _try_parse_json(raw)
     if scenes is None:
@@ -135,6 +173,7 @@ def segment(model: Llama, transcript: str, max_scenes: int = 5) -> list[dict]:
         }
         for i, s in enumerate(scenes)
     ]
+    result = _polish_captions(model, result, personas=personas)
     for scene in result:
         print(
             f"[segmenter] scene {scene['index']}: prompt_en={scene['prompt_en']!r}"
@@ -155,7 +194,7 @@ def _estimate_scenes(transcript: str, hard_max: int) -> int:
         r"[.!?]"
         r"|\s+og\s+|\s+and\s+|\s+then\s+"
         r"|\s+etterpå\s*|\s+deretter\s*|\s+så\s+|\s+først\s+"
-        r"|\s+etter\s+det\s*|\s+til\s+slutt\s*|\s+bagetter\s*",
+        r"|\s+etter\s+det\s*|\s+til\s+slutt\s*|\s+bagetter\s*|\s+senere\s*",
         transcript.strip(),
         flags=re.IGNORECASE,
     )
@@ -190,8 +229,19 @@ def _try_parse_json(text: str) -> list | None:
     return all_items if all_items else None
 
 
-def _call_model(model: Llama, transcript: str, max_scenes: int, retry: bool = False) -> str:
+def _call_model(
+    model: Llama,
+    transcript: str,
+    max_scenes: int,
+    retry: bool = False,
+    personas: list[dict] | None = None,
+) -> str:
     system = _SYSTEM_PROMPT
+    if personas:
+        descriptions = "; ".join(
+            f"{p['name']} is {p['description']}" for p in personas
+        )
+        system += _PERSONA_SUFFIX.format(personas=descriptions)
     if retry:
         system += " You must return ONLY the JSON array, starting with [ and ending with ]."
     if max_scenes == 1:
@@ -203,10 +253,71 @@ def _call_model(model: Llama, transcript: str, max_scenes: int, retry: bool = Fa
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        max_tokens=512,
+        max_tokens=1024,
         temperature=0.1,
     )
     return result["choices"][0]["message"]["content"]
+
+
+def _polish_captions(
+    model: Llama,
+    scenes: list[dict],
+    personas: list[dict] | None = None,
+) -> list[dict]:
+    """Rewrite caption_no fields: present tense, pronoun resolution, strip connectors.
+
+    Makes one focused LLM call with all captions bundled. Falls back to the
+    original captions if the model returns an unusable response.
+    """
+    captions = [s["caption_no"] for s in scenes]
+    captions_json = json.dumps(captions, ensure_ascii=False)
+
+    system = (
+        "You rewrite Norwegian captions for visual instruction cards. "
+        "Return ONLY a valid JSON array of strings. No prose, no code fences."
+    )
+    if personas:
+        descriptions = "; ".join(f"{p['name']} is {p['description']}" for p in personas)
+        system += f" Characters: {descriptions}."
+
+    user = _POLISH_TEMPLATE.format(captions_json=captions_json)
+
+    result = model.create_chat_completion(
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        max_tokens=256,
+        temperature=0.1,
+    )
+    raw = result["choices"][0]["message"]["content"]
+    print(f"[segmenter] polish raw output: {raw!r}", file=sys.stderr, flush=True)
+
+    try:
+        rewritten = json.loads(raw.strip())
+        if isinstance(rewritten, list) and len(rewritten) == len(scenes):
+            return [
+                {**scene, "caption_no": str(rewritten[i])}
+                for i, scene in enumerate(scenes)
+            ]
+    except (json.JSONDecodeError, IndexError):
+        pass
+
+    # Try extracting a [...] block if the model added surrounding text
+    match = re.search(r"\[.*?\]", raw, re.DOTALL)
+    if match:
+        try:
+            rewritten = json.loads(match.group())
+            if isinstance(rewritten, list) and len(rewritten) == len(scenes):
+                return [
+                    {**scene, "caption_no": str(rewritten[i])}
+                    for i, scene in enumerate(scenes)
+                ]
+        except (json.JSONDecodeError, IndexError):
+            pass
+
+    print("[segmenter] caption polish failed, keeping originals", file=sys.stderr, flush=True)
+    return scenes
 
 
 def _fallback_split(transcript: str) -> list[dict]:

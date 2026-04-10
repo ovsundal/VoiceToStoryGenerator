@@ -74,11 +74,12 @@ def download_model(model_dir: str = DEFAULT_MODEL_DIR, on_progress=None) -> None
         on_progress(100)
 
 
-POSITIVE_PREFIX = (
-    "flat design cartoon illustration, bold black outlines, simple geometric shapes, "
-    "plain white background, no shading, no gradients, no texture, "
-    "limited color palette (max 5 colors), one main action visible, "
-    "children's book style, clear and unambiguous, large simple figures"
+# Style suffix — kept short so the scene description at the front gets more weight.
+# FLUX.1-schnell is an autoregressive transformer: early tokens dominate attention.
+# Scene description goes FIRST; style comes after.
+_STYLE_SUFFIX = (
+    "flat cartoon illustration, bold black outlines, plain white background, "
+    "children's book style, simple shapes, max 5 colors"
 )
 
 
@@ -111,12 +112,13 @@ def generate(pipe: FluxPipeline, prompt_en: str, output_path: str) -> None:
     """
     import sys  # noqa: PLC0415
 
-    full_prompt = f"{POSITIVE_PREFIX}, {prompt_en}"
+    # Scene description first — FLUX attends more to early tokens.
+    full_prompt = f"{prompt_en}, {_STYLE_SUFFIX}"
     print(f"[image_generator] input: {prompt_en!r}", file=sys.stderr, flush=True)
     print(f"[image_generator] full prompt: {full_prompt}", file=sys.stderr, flush=True)
     image = pipe(
         prompt=full_prompt,
-        num_inference_steps=2,
+        num_inference_steps=4,
         guidance_scale=0.0,
         height=512,
         width=512,

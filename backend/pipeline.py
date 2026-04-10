@@ -15,6 +15,13 @@ def emit(event: str, **data) -> None:
     print(json.dumps({"event": event, **data}), flush=True)
 
 
+# Characters that appear in stories — used to give the LLM consistent descriptions.
+# Update this list as needed; each entry needs "name" and "description".
+PERSONAS: list[dict] = [
+    {"name": "Emil", "description": "a 9-year-old boy with short blonde hair"},
+    {"name": "Sigurd", "description": "a 7-year-old boy with short blonde hair, Emil's younger brother"},
+]
+
 # Kept for reference and backward-compat with existing tests
 STUB_SCENES = [
     {"index": 0, "caption_no": "Vasker hendene", "prompt_en": "child washing hands at sink"},
@@ -67,7 +74,7 @@ def _run_segmentation(text: str) -> list[dict]:
     emit("progress", stage="loading_model", model="llama")
     model = load_segmenter()
     emit("progress", stage="segmenting")
-    return segment(model, text)
+    return segment(model, text, personas=PERSONAS)
 
 
 def run(audio_path: str | None, text: str | None, output_dir: str) -> None:
