@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/ove.sundal/WebstormProjects/VoiceToStoryGenerator/resources/models/flux/models--black-forest-labs--FLUX.1-schnell/snapshots/741f7c3ce8b383c54771c7003378a50191e9efe9/transformer/**)",
+      "Read(//c/Users/ove.sundal/WebstormProjects/VoiceToStoryGenerator/resources/models/flux/models--black-forest-labs--FLUX.1-schnell/refs/**)"
+    ]
+  }
+}

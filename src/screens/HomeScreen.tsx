@@ -3,10 +3,10 @@ import { useRecorder } from '../hooks/useRecorder';
 import './HomeScreen.css';
 
 interface HomeScreenProps {
-  onStartPipeline: () => void;
+  onStartSegment: (payload: { audioPath?: string; text?: string }) => void;
 }
 
-export function HomeScreen({ onStartPipeline }: HomeScreenProps) {
+export function HomeScreen({ onStartSegment }: HomeScreenProps) {
   const [text, setText] = useState('');
   const [transcribeStage, setTranscribeStage] = useState<string | null>(null);
   const [downloadPct, setDownloadPct] = useState<number | null>(null);
@@ -48,8 +48,7 @@ export function HomeScreen({ onStartPipeline }: HomeScreenProps) {
 
   const handleSubmitText = () => {
     if (!text.trim()) return;
-    onStartPipeline();
-    window.electronAPI.startPipelineWithText(text.trim());
+    onStartSegment({ text: text.trim() });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

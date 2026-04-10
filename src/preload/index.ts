@@ -6,9 +6,16 @@ export interface Scene {
   image_path: string;
 }
 
+export interface SegmentedScene {
+  index: number;
+  caption_no: string;
+  prompt_en: string;
+}
+
 export interface PipelineProgressEvent {
   event: 'progress' | 'scene' | 'done' | 'error';
   stage?: string;
+  model?: string;
   index?: number;
   total?: number;
   pct?: number;
@@ -27,6 +34,9 @@ export interface ElectronAPI {
   transcribeAudio: (audioPath: string) => Promise<string>;
   cancelTranscription: () => Promise<void>;
   onTranscriptionEvent: (callback: (event: PipelineProgressEvent) => void) => () => void;
+  segmentStory: (payload: { audioPath?: string; text?: string }) => Promise<SegmentedScene[]>;
+  generateImages: (scenes: SegmentedScene[], outputDir: string) => Promise<void>;
+  getOutputDir: () => Promise<string>;
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -53,4 +63,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('transcription:event', handler);
     return () => ipcRenderer.removeListener('transcription:event', handler);
   },
+
+  segmentStory: (payload: { audioPath?: string; text?: string }) =>
+    ipcRenderer.invoke('pipeline:segment', payload),
+
+  generateImages: (scenes: SegmentedScene[], outputDir: string) =>
+    ipcRenderer.invoke('pipeline:generate', scenes, outputDir),
+
+  getOutputDir: () => ipcRenderer.invoke('output:create-dir'),
 } satisfies ElectronAPI);

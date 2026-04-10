@@ -1,0 +1,134 @@
+.review-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40px 32px;
+  background: var(--bg-primary);
+  gap: 24px;
+}
+
+.review-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.review-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 480px;
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 600px;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+}
+
+.review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.review-remove-button {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.review-remove-button:hover {
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.08);
+}
+
+.review-add-button {
+  align-self: flex-start;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 8px 4px;
+  transition: opacity 150ms ease;
+}
+
+.review-add-button:hover {
+  opacity: 0.75;
+}
+
+.review-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.review-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 150ms ease;
+}
+
+.review-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.review-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.review-cancel-button {
+  padding: 12px 28px;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  transition: background-color 150ms ease;
+}
+
+.review-cancel-button:hover {
+  background: var(--bg-secondary);
+}
+
+.review-generate-button {
+  padding: 12px 32px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  transition: background-color 150ms ease;
+}
+
+.review-generate-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.review-generate-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

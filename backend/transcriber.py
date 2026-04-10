@@ -89,5 +89,10 @@ def transcribe(model: WhisperModel, audio_path: str, language: str = "no") -> st
         audio_path: Path to audio file (WAV, WebM, MP3, etc.).
         language: BCP-47 language code. "no" = Norwegian Bokmål.
     """
+    import sys  # noqa: PLC0415
+
+    print(f"[transcriber] input: {audio_path}", file=sys.stderr, flush=True)
     segments, _ = model.transcribe(audio_path, language=language)
-    return " ".join(segment.text.strip() for segment in segments)
+    transcript = " ".join(segment.text.strip() for segment in segments)
+    print(f"[transcriber] output: {transcript!r}", file=sys.stderr, flush=True)
+    return transcript

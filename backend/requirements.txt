@@ -1,4 +1,18 @@
 faster-whisper
+huggingface_hub
+tqdm
 pytest>=8.0
 pytest-mock>=3.14
 ruff>=0.6
+# AI pipeline — Phase 3
+# llama-cpp-python pre-built wheel for Python 3.12 Windows (no MSVC required)
+# For other platforms, build from source: pip install llama-cpp-python
+https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.19/llama_cpp_python-0.3.19-cp312-cp312-win_amd64.whl
+Pillow
+# PyTorch with CUDA 12.8 support (compatible with CUDA 13.x drivers)
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch
+torchvision
+diffusers
+optimum[quanto]
+accelerate>=0.17.0

@@ -1,25 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { launchApp } from './helpers';
 
-test('stub pipeline flow: home → processing → done', async () => {
-  const { app, page } = await launchApp();
-
-  await expect(page.getByTestId('record-button')).toBeVisible();
-  await page.getByTestId('record-button').click();
-
-  await expect(page.getByTestId('processing-screen')).toBeVisible({ timeout: 3_000 });
-  await expect(page.getByTestId('progress-stage')).toContainText(
-    /Transkriberer|Bryter ned|Genererer|Ferdig/,
-    { timeout: 10_000 }
-  );
-
-  // After done, returns to home screen
-  await expect(page.getByTestId('record-button')).toBeVisible({ timeout: 15_000 });
-
-  await app.close();
-});
-
-test('text input flow: type story → processing → done', async () => {
+test('text input flow: type story → processing → review → viewer', async () => {
   const { app, page } = await launchApp();
 
   await page.getByTestId('story-textarea').fill('Nils vasker hendene og går ut.');
@@ -27,23 +9,44 @@ test('text input flow: type story → processing → done', async () => {
 
   await expect(page.getByTestId('processing-screen')).toBeVisible({ timeout: 3_000 });
   await expect(page.getByTestId('progress-stage')).toContainText(
-    /Bryter ned|Genererer|Ferdig/,
+    /Bryter ned|Genererer|Starter/,
     { timeout: 10_000 }
   );
 
-  await expect(page.getByTestId('record-button')).toBeVisible({ timeout: 15_000 });
+  // Proceeds to review screen
+  await expect(page.getByTestId('review-screen')).toBeVisible({ timeout: 10_000 });
+
+  // Click generate to proceed to viewer
+  await page.getByTestId('generate-button').click();
+  await expect(page.getByTestId('viewer-screen')).toBeVisible({ timeout: 15_000 });
 
   await app.close();
 });
 
-test('cancel button returns to home screen', async () => {
+test('cancel from processing or review returns to home screen', async () => {
   const { app, page } = await launchApp();
 
-  await page.getByTestId('record-button').click();
-  await expect(page.getByTestId('processing-screen')).toBeVisible({ timeout: 3_000 });
+  // Submit text — may land on processing then quickly on review
+  await page.getByTestId('story-textarea').fill('Barnet vasker hendene.');
+  await page.getByTestId('submit-text-button').click();
 
-  await page.getByTestId('cancel-button').click();
-  await expect(page.getByTestId('record-button')).toBeVisible({ timeout: 3_000 });
+  // Wait for either processing or review screen, then click the Avbryt button
+  const cancelBtn = page.getByRole('button', { name: 'Avbryt' });
+  await expect(cancelBtn).toBeVisible({ timeout: 10_000 });
+  await cancelBtn.click();
+
+  await expect(page.getByTestId('record-button')).toBeVisible({ timeout: 5_000 });
+
+  await app.close();
+});
+
+test('submit button is disabled when textarea is empty', async () => {
+  const { app, page } = await launchApp();
+
+  await expect(page.getByTestId('submit-text-button')).toBeDisabled();
+
+  await page.getByTestId('story-textarea').fill('test');
+  await expect(page.getByTestId('submit-text-button')).toBeEnabled();
 
   await app.close();
 });

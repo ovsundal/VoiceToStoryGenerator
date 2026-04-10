@@ -18,7 +18,22 @@
       "Bash(pytest:*)",
       "Bash(pip install pytest:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(python -c ':*)",
+      "Read(//c/Users/ove.sundal/AppData/Local/Programs/Python//**)",
+      "Read(//c/Users/ove.sundal/miniconda3/**)",
+      "Read(//c/Users/ove.sundal/anaconda3/**)",
+      "Read(//c/Users/ove.sundal/**)",
+      "Bash(/c/Users/ove.sundal/AppData/Local/Programs/Python/Python314/python.exe:*)",
+      "Bash(node scripts/build-icon.mjs)",
+      "Bash(python3 -m pytest backend/tests/ -m \"not slow\" -v)",
+      "Bash(py -m pytest backend/tests/ -m \"not slow\" -v)",
+      "Bash(py -m ruff check backend/)",
+      "Bash(python -m pytest backend/tests/ -m \"not slow\" -v)",
+      "Bash(backend/venv/Scripts/python.exe -m pytest backend/tests/ -m \"not slow\" -v)",
+      "Bash(backend/venv/Scripts/pip install:*)",
+      "Bash(backend/venv/Scripts/ruff check:*)",
+      "Bash(backend/venv/Scripts/ruff format:*)"
     ]
   }
 }

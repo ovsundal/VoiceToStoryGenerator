@@ -3,6 +3,11 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { usePipeline } from '../../../src/hooks/usePipeline';
 import type { PipelineProgressEvent } from '../../../src/preload/index';
 
+const MOCK_SEGMENTED_SCENES = [
+  { index: 0, caption_no: 'Vasker hendene', prompt_en: 'child washing hands' },
+  { index: 1, caption_no: 'Tørker hendene', prompt_en: 'child drying hands' },
+];
+
 describe('usePipeline', () => {
   beforeEach(() => {
     window.electronAPI = {
@@ -14,6 +19,9 @@ describe('usePipeline', () => {
       transcribeAudio: vi.fn().mockResolvedValue('Barnet vasker hendene.'),
       cancelTranscription: vi.fn().mockResolvedValue(undefined),
       onTranscriptionEvent: vi.fn().mockReturnValue(() => {}),
+      segmentStory: vi.fn().mockResolvedValue(MOCK_SEGMENTED_SCENES),
+      generateImages: vi.fn().mockResolvedValue(undefined),
+      getOutputDir: vi.fn().mockResolvedValue('/tmp/story_test'),
     };
   });
 
@@ -22,6 +30,7 @@ describe('usePipeline', () => {
     expect(result.current.isRunning).toBe(false);
     expect(result.current.stage).toBeNull();
     expect(result.current.scenes).toHaveLength(0);
+    expect(result.current.segmentedScenes).toBeNull();
     expect(result.current.error).toBeNull();
   });
 
@@ -127,5 +136,41 @@ describe('usePipeline', () => {
     });
     expect(result.current.isRunning).toBe(false);
     expect(result.current.error).toBe('Modell ikke funnet');
+  });
+
+  test('segment calls segmentStory and sets segmentedScenes', async () => {
+    const { result } = renderHook(() => usePipeline());
+    await act(async () => {
+      await result.current.segment({ text: 'Barnet vasker hendene.' });
+    });
+    expect(window.electronAPI.segmentStory).toHaveBeenCalledWith({
+      text: 'Barnet vasker hendene.',
+    });
+    expect(result.current.segmentedScenes).toEqual(MOCK_SEGMENTED_SCENES);
+    expect(result.current.isRunning).toBe(false);
+  });
+
+  test('generateImages calls generateImages API', async () => {
+    const { result } = renderHook(() => usePipeline());
+    await act(async () => {
+      await result.current.generateImages(MOCK_SEGMENTED_SCENES, '/tmp/story');
+    });
+    expect(window.electronAPI.generateImages).toHaveBeenCalledWith(
+      MOCK_SEGMENTED_SCENES,
+      '/tmp/story'
+    );
+  });
+
+  test('reset restores initial state', async () => {
+    const { result } = renderHook(() => usePipeline());
+    await act(async () => {
+      await result.current.start('/tmp/audio.wav');
+    });
+    act(() => {
+      result.current.reset();
+    });
+    expect(result.current.isRunning).toBe(false);
+    expect(result.current.stage).toBeNull();
+    expect(result.current.segmentedScenes).toBeNull();
   });
 });

@@ -9,15 +9,28 @@ interface ProcessingScreenProps {
 
 const stageLabels: Record<string, string> = {
   starting: 'Starter…',
-  loading_model: 'Laster inn talemodell…',
+  downloading_model: 'Laster ned modell…',
+  loading_model: 'Laster inn modell…',
   transcribing: 'Transkriberer tale…',
   segmenting: 'Bryter ned i scener…',
   generating_image: 'Genererer bilde',
   done: 'Ferdig!',
 };
 
+const loadingModelLabels: Record<string, string> = {
+  whisper: 'Laster inn talemodell…',
+  llama: 'Laster inn tekstmodell…',
+  flux: 'Laster inn bildegenereringsmodell…',
+};
+
+const downloadLabels: Record<string, { label: string; size: string }> = {
+  whisper: { label: 'talemodell', size: '3 GB' },
+  llama: { label: 'tekstmodell', size: '2 GB' },
+  flux: { label: 'bildemodell', size: '33 GB' },
+};
+
 export function ProcessingScreen({ onCancel, onDone }: ProcessingScreenProps) {
-  const { stage, progress, downloadPct, error, isRunning } = usePipeline();
+  const { stage, progress, downloadPct, downloadModel, error, isRunning } = usePipeline();
 
   useEffect(() => {
     if (stage === 'done') {
@@ -26,12 +39,18 @@ export function ProcessingScreen({ onCancel, onDone }: ProcessingScreenProps) {
     }
   }, [stage, onDone]);
 
-  const stageText =
-    stage === 'generating_image' && progress
-      ? `Genererer bilde ${progress.current} av ${progress.total}…`
-      : stage === 'downloading_model'
-        ? `Laster ned talemodell (3 GB, kun første gang)… ${downloadPct != null ? `${downloadPct}%` : ''}`
-        : (stageLabels[stage ?? ''] ?? 'Behandler…');
+  const stageText = (() => {
+    if (stage === 'generating_image' && progress)
+      return `Genererer bilde ${progress.current} av ${progress.total}…`;
+    if (stage === 'loading_model' && downloadModel)
+      return loadingModelLabels[downloadModel] ?? 'Laster inn modell…';
+    if (stage === 'downloading_model') {
+      const dl = downloadLabels[downloadModel ?? ''];
+      const name = dl ? `Laster ned ${dl.label} (${dl.size}, kun første gang)` : 'Laster ned modell';
+      return `${name}… ${downloadPct != null ? `${downloadPct}%` : ''}`;
+    }
+    return stageLabels[stage ?? ''] ?? 'Behandler…';
+  })();
 
   const isDeterminate = downloadPct != null;
 
