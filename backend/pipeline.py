@@ -20,6 +20,10 @@ def emit(event: str, **data) -> None:
 PERSONAS: list[dict] = [
     {"name": "Emil", "description": "a 9-year-old boy with short blonde hair"},
     {"name": "Sigurd", "description": "a 7-year-old boy with short blonde hair, Emil's younger brother"},
+    {"name": "Ove", "description": "the father, an adult man"},
+    {"name": "Kristin", "description": "the mother, an adult woman"},
+    {"name": "mormor", "description": "the maternal grandmother, an elderly woman"},
+    {"name": "morfar", "description": "the maternal grandfather, an elderly man"},
 ]
 
 # Kept for reference and backward-compat with existing tests

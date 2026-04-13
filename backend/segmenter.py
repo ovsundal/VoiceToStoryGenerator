@@ -70,9 +70,22 @@ _SYSTEM_PROMPT = (
     "Return ONLY a valid JSON array. No prose, no code fences, no extra text."
 )
 
+# Norwegian words that have misleading direct English translations.
+# Add entries here whenever a word is mistranslated in prompt_en.
+_VOCAB_HINTS = (
+    " Norwegian vocabulary — use EXACT English descriptions below, never the literal translation:"
+    " 'perle'/'perler' = child doing bead pegging (placing small plastic beads on a pegboard), NOT pearls or oysters;"
+    " 'sykkeltur' = child riding a bicycle outdoors, NOT skiing or snow;"
+    " 'vi' (we) = the whole family together: Emil, Sigurd, their mother and their father — always show ALL FOUR in prompt_en unless the sentence names specific people;"
+    " 'mormor' = elderly grandmother; 'morfar' = elderly grandfather — when both appear, show both;"
+)
+
 _PERSONA_SUFFIX = (
     " Characters: {personas}. "
-    "When a character's name appears in the story, use their description in prompt_en."
+    "CRITICAL — when writing prompt_en: replace each character name with their physical description. "
+    "Use the EXACT gender from the description — a character described as 'boy' must appear as 'boy' "
+    "in prompt_en, NEVER as 'girl'. Never change a character's gender. "
+    "Multiple characters of the same gender: write 'two boys', not 'boy and boy'."
 )
 
 _DESCRIBE_TEMPLATE = """\
@@ -97,17 +110,19 @@ Split the story into scenes — one scene per distinct action that is explicitly
 STRICT RULES:
 - Only include actions that appear in the text. Never add implied or inferred steps.
 - Each scene must describe exactly ONE action. Never combine two actions into one scene.
-- Produce exactly one scene per explicit action mentioned, up to {max_scenes} scenes total.
+- Within-sentence connectors like "og til slutt", "og etterpå", "og deretter", "og så" each introduce a NEW separate scene — always split on them.
+- Count every distinct action in the story. If there are N actions, produce exactly N scenes (up to {max_scenes}).
 - prompt_en: describe who is doing what AND the key setting or object visible (e.g. "school building", "swimming pool", "dinner table", "PlayStation controller"). Max 15 words. No invented details.
 - caption_no: copy the relevant words from the story text as-is.
 
 Example:
-Story: "Emil skal på skolen. Etterpå skal han på skolefritidsordning. Senere skal han og Sigurd spille playstation."
+Story: "Emil skal på skolen. Etterpå skal han på skolefritidsordning. Ja, så skal han spille playstation, og til slutt skal han legge seg."
 Output:
 [
   {{"prompt_en": "boy walking toward a school building", "caption_no": "Emil skal på skolen"}},
   {{"prompt_en": "boy arriving at afterschool care building", "caption_no": "Etterpå skal han på skolefritidsordning"}},
-  {{"prompt_en": "two boys sitting on a couch playing PlayStation", "caption_no": "Senere skal han og Sigurd spille playstation"}}
+  {{"prompt_en": "boy sitting on a couch playing PlayStation", "caption_no": "så skal han spille playstation"}},
+  {{"prompt_en": "boy lying down in bed", "caption_no": "til slutt skal han legge seg"}}
 ]
 
 Story: {transcript}"""
@@ -174,6 +189,7 @@ def segment(model: Llama, transcript: str, max_scenes: int = 5, personas: list[d
         for i, s in enumerate(scenes)
     ]
     result = _polish_captions(model, result, personas=personas)
+    result = _fix_prompt_genders(result, personas)
     for scene in result:
         print(
             f"[segmenter] scene {scene['index']}: prompt_en={scene['prompt_en']!r}"
@@ -236,7 +252,7 @@ def _call_model(
     retry: bool = False,
     personas: list[dict] | None = None,
 ) -> str:
-    system = _SYSTEM_PROMPT
+    system = _SYSTEM_PROMPT + _VOCAB_HINTS
     if personas:
         descriptions = "; ".join(
             f"{p['name']} is {p['description']}" for p in personas
@@ -317,6 +333,59 @@ def _polish_captions(
             pass
 
     print("[segmenter] caption polish failed, keeping originals", file=sys.stderr, flush=True)
+    return scenes
+
+
+def _fix_prompt_genders(scenes: list[dict], personas: list[dict] | None) -> list[dict]:
+    """Safety net: correct misgendered characters in prompt_en.
+
+    Logic: if the caption_no mentions only male personas (and no female ones from
+    the known persona list), any 'girl'/'girls' in prompt_en is wrong — replace with
+    'boy'/'boys'.  Symmetrically for female-only scenes.
+
+    This catches the common LLM failure of misgendering a known character even when
+    the correct gender was in the system prompt.
+    """
+    if not personas:
+        return scenes
+
+    male_names = {
+        p["name"].lower()
+        for p in personas
+        if "boy" in p["description"].lower() or " man" in p["description"].lower()
+    }
+    female_names = {
+        p["name"].lower()
+        for p in personas
+        if "girl" in p["description"].lower() or "woman" in p["description"].lower()
+    }
+
+    for scene in scenes:
+        caption_lower = scene["caption_no"].lower()
+        has_male_persona = any(n in caption_lower for n in male_names)
+        has_female_persona = any(n in caption_lower for n in female_names)
+
+        prompt = scene["prompt_en"]
+
+        if has_male_persona and not has_female_persona:
+            # Only male personas in this scene — any "girl" is wrong
+            fixed = re.sub(r"\bgirl\b", "boy", prompt, flags=re.IGNORECASE)
+            fixed = re.sub(r"\bgirls\b", "boys", fixed, flags=re.IGNORECASE)
+        elif has_female_persona and not has_male_persona:
+            # Only female personas in this scene — any "boy" is wrong
+            fixed = re.sub(r"\bboy\b", "girl", prompt, flags=re.IGNORECASE)
+            fixed = re.sub(r"\bboys\b", "girls", fixed, flags=re.IGNORECASE)
+        else:
+            fixed = prompt
+
+        if fixed != prompt:
+            print(
+                f"[segmenter] gender fix: {prompt!r} → {fixed!r}",
+                file=sys.stderr,
+                flush=True,
+            )
+            scene["prompt_en"] = fixed
+
     return scenes
 
 

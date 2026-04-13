@@ -74,9 +74,11 @@ def download_model(model_dir: str = DEFAULT_MODEL_DIR, on_progress=None) -> None
         on_progress(100)
 
 
-# Style suffix — kept short so the scene description at the front gets more weight.
 # FLUX.1-schnell is an autoregressive transformer: early tokens dominate attention.
-# Scene description goes FIRST; style comes after.
+# "No text" must come FIRST so it is weighted most heavily — putting it at the end
+# is why text keeps appearing despite the instruction.
+_NO_TEXT_PREFIX = "no text, no words, no letters, no captions, no labels. "
+
 _STYLE_SUFFIX = (
     "flat cartoon illustration, bold black outlines, plain white background, "
     "children's book style, simple shapes, max 5 colors"
@@ -112,8 +114,8 @@ def generate(pipe: FluxPipeline, prompt_en: str, output_path: str) -> None:
     """
     import sys  # noqa: PLC0415
 
-    # Scene description first — FLUX attends more to early tokens.
-    full_prompt = f"{prompt_en}, {_STYLE_SUFFIX}"
+    # No-text prefix first (highest attention weight), then scene, then style.
+    full_prompt = f"{_NO_TEXT_PREFIX}{prompt_en}, {_STYLE_SUFFIX}"
     print(f"[image_generator] input: {prompt_en!r}", file=sys.stderr, flush=True)
     print(f"[image_generator] full prompt: {full_prompt}", file=sys.stderr, flush=True)
     image = pipe(
